@@ -116,7 +116,7 @@ cd APS-cloud-comp
 source comandos.sh
 touch /etc/init.d/runWebServer.sh
 echo '#!bin/bash
-python3 /APS-cloud-comp/webServer.py >> /etc/init.d/runWebServer.sh
+python3 /APS-cloud-comp/webServer.py' >> /etc/init.d/runWebServer.sh
 update-rc.d runWebServer.sh defaults
 chmod 755 /etc/init.d/runWebServer.sh
 reboot'''
