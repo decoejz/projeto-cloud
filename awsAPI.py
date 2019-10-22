@@ -113,7 +113,13 @@ def create_instance(key_pair_name,sec_group_name):
         UserData='''#!/bin/bash
 git clone https://github.com/decoejz/APS-cloud-comp.git
 cd APS-cloud-comp
-source comandos.sh'''
+source comandos.sh
+touch /etc/init.d/runWebServer.sh
+echo '#!bin/bash
+python3 /APS-cloud-comp/webServer.py >> /etc/init.d/runWebServer.sh
+update-rc.d runWebServer.sh defaults
+chmod 755 /etc/init.d/runWebServer.sh
+reboot'''
     )
 
 def delete_instance():
@@ -178,6 +184,19 @@ def check_continue(instances_ids):
             terminated += 1
 
     return terminated
+
+# def check_status_ok()
+#     response = client.describe_instance_status(
+#         InstanceIds=instances_ids,
+#         IncludeAllInstances=True
+#     )
+
+#     terminated = 0
+#     for i in response['InstanceStatuses']:
+#         if(not i['InstanceState']['Name'] == 'terminated'):
+#             terminated += 1
+
+#     return terminated
 
 
 print("\n\nCOMECOU")
