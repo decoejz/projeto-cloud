@@ -115,10 +115,16 @@ git clone https://github.com/decoejz/APS-cloud-comp.git
 cd APS-cloud-comp
 source comandos.sh
 touch /etc/init.d/runWebServer.sh
-echo '#!bin/bash
+echo '#!/bin/bash
 python3 /APS-cloud-comp/webServer.py' >> /etc/init.d/runWebServer.sh
-update-rc.d runWebServer.sh defaults
 chmod 755 /etc/init.d/runWebServer.sh
+echo '
+[Service]
+ExecStart=/etc/init.d/runWebServer.sh
+
+[Install]
+WantedBy=default.target' >> /etc/systemd/system/runWebServer.service
+systemctl enable runWebServer
 reboot'''
     )
 
@@ -185,18 +191,18 @@ def check_continue(instances_ids):
 
     return terminated
 
-# def check_status_ok()
-#     response = client.describe_instance_status(
-#         InstanceIds=instances_ids,
-#         IncludeAllInstances=True
-#     )
+def check_status_ok():
+    response = client.describe_instance_status(
+        InstanceIds=instances_ids,
+        IncludeAllInstances=True
+    )
 
-#     terminated = 0
-#     for i in response['InstanceStatuses']:
-#         if(not i['InstanceState']['Name'] == 'terminated'):
-#             terminated += 1
+    terminated = 0
+    for i in response['InstanceStatuses']:
+        if(not i['InstanceState']['Name'] == 'terminated'):
+            terminated += 1
 
-#     return terminated
+    return terminated
 
 
 print("\n\nCOMECOU")
@@ -208,5 +214,6 @@ delete_instance()
 create_keypair(key_pair_name)
 create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
 create_instance(key_pair_name, sec_group_name)
+# check_status_ok()
 
 print("TERMINOU\n\n")
