@@ -243,7 +243,7 @@ def create_load_balancer(name,sec_id):
         Listeners=[{
             'Protocol': 'HTTP',
             'LoadBalancerPort': 80,
-            'InstancePort': 80
+            'InstancePort': 5000
         }],
         AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
         SecurityGroups=[sec_id],
@@ -280,7 +280,7 @@ def create_l_config(name,img_name,key_p_name,sec_g_id):
         LaunchConfigurationName=name,
         ImageId=img_id,
         KeyName=key_p_name,
-        SecurityGroups=[sec_g_id],
+        SecurityGroups=sec_g_id,
         InstanceType='t2.micro'
     )
 
@@ -291,21 +291,45 @@ def delete_l_config(name):
     except:
         pass
 
+def create_auto_scaling(name,l_config_name,load_name):
+    print('CRIANDO AUTO SCALING GROUP')
+    autoscale.create_auto_scaling_group(
+        AutoScalingGroupName=name,
+        LaunchConfigurationName=l_config_name,
+        MinSize=1,
+        MaxSize=5,
+        AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
+        LoadBalancerNames=load_name
+    )
+
+def delete_auto_scaling(name):
+    try:
+        print('DELETANDO AUTO SCALING GROUP')
+        autoscale.delete_auto_scaling_group(
+            AutoScalingGroupName=name,
+            ForceDelete=True
+        )
+    except:
+        pass
+
 key_pair_name = "keypair-APS3-deco"
 sec_group_name = 'secgroup-APS3-deco'
 img_name = 'P1 Deco'
 load_name = 'LoadProjDeco'
 launch_name = 'LaunchConfigDeco'
+auto_name = 'AutoScaleDeco'
 
-# delete_instances()
-# delete_image(img_name)
-# create_keypair(key_pair_name)
-# sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
-# ins_id = create_instance(key_pair_name, sec_group_name)
-# create_image(ins_id,img_name)
-# delete_ld_balancer(load_name)
-# create_load_balancer(load_name,sec_id)
+delete_auto_scaling(auto_name)
 delete_l_config(launch_name)
-create_l_config(launch_name,img_name,key_pair_name,'sg-07c1b18ad1eaf764f')#sec_id)
+delete_ld_balancer(load_name)
+delete_instances()
+delete_image(img_name)
+create_keypair(key_pair_name)
+sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
+ins_id = create_instance(key_pair_name, sec_group_name)
+create_image(ins_id,img_name)
+create_load_balancer(load_name,sec_id)
+create_l_config(launch_name,img_name,key_pair_name,[sec_id])
+create_auto_scaling(auto_name,launch_name,[load_name])
 
 print("TERMINOU\n\n")
