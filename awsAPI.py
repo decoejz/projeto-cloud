@@ -284,6 +284,13 @@ def create_l_config(name,img_name,key_p_name,sec_g_id):
         InstanceType='t2.micro'
     )
 
+def delete_l_config(name):
+    try:
+        print('DELETANDO LAUNCH CONFIGURATION')
+        autoscale.delete_launch_configuration(LaunchConfigurationName=name)
+    except:
+        pass
+
 key_pair_name = "keypair-APS3-deco"
 sec_group_name = 'secgroup-APS3-deco'
 img_name = 'P1 Deco'
@@ -298,6 +305,7 @@ launch_name = 'LaunchConfigDeco'
 # create_image(ins_id,img_name)
 # delete_ld_balancer(load_name)
 # create_load_balancer(load_name,sec_id)
+delete_l_config(launch_name)
 create_l_config(launch_name,img_name,key_pair_name,'sg-07c1b18ad1eaf764f')#sec_id)
 
 print("TERMINOU\n\n")
