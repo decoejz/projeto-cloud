@@ -2,10 +2,17 @@ import boto3
 import os, stat
 from time import sleep
 
+print("\n\nCOMECOU")
+
 ACCESS_ID = os.environ.get("aws_access_key_id")
 SECRET_KEY = os.environ.get("aws_secret_access_key")
 
 client = boto3.client('ec2',
+    aws_access_key_id=ACCESS_ID,
+    aws_secret_access_key=SECRET_KEY,
+    region_name="us-east-1")
+
+ldblcr = boto3.client('elb',
     aws_access_key_id=ACCESS_ID,
     aws_secret_access_key=SECRET_KEY,
     region_name="us-east-1")
@@ -37,11 +44,13 @@ def create_sec_group(name,desc):
         client.delete_security_group(GroupName=name)
         print("APAGOU SECURITY GROUP")
 
-    client.create_security_group(Description=desc, GroupName=name)
+    response = client.create_security_group(Description=desc, GroupName=name)
 
     print("CRIOU SECURITY GROUP")
 
     liberate_port(name)
+
+    return response['GroupId']
 
 def liberate_port(name):
     client.authorize_security_group_ingress(
@@ -127,25 +136,24 @@ WantedBy=default.target' >> /etc/systemd/system/runWebServer.service
 systemctl enable runWebServer
 reboot'''
     )
+    return (response['Instances'][0]['InstanceId'])
 
-def delete_instance():
-    instances_ids = check_instances()
+def delete_instances():
+    instances_ids = get_instance_id()
     instances_ids = instance_filter(instances_ids)
 
-    if (len(instances_ids)>0):
-        print('VAI TERMINAR A INSTÂNCIA')
+    try:    
         client.terminate_instances(
             InstanceIds=instances_ids
         )
 
-        terminated = len(instances_ids)
-        while (terminated > 0):
-            print('TERMINANDO')
-            terminated = check_continue(instances_ids)
-            sleep(2) #time in seconds
+        print('TERMINANDO')
+        waiter = client.get_waiter('instance_terminated')
+        waiter.wait(InstanceIds=instances_ids)
+    except:
+        pass
 
-
-def check_instances():
+def get_instance_id():
     print("CHECANDO INSTÂNCIAS")
     response = client.describe_instances(
         Filters=[
@@ -157,7 +165,7 @@ def check_instances():
             },
         ]
     )
-    # print(response)
+
     instances_ids = []
     for i in response['Reservations']:
         instances_ids.append(i['Instances'][0]['InstanceId'])
@@ -178,42 +186,89 @@ def instance_filter(instances_ids):
 
     return instances_ids
 
-def check_continue(instances_ids):
-    response = client.describe_instance_status(
-        InstanceIds=instances_ids,
-        IncludeAllInstances=True
+def create_image(instance_id, image_name):
+    print('INICIALIZANDO')
+    waiter = client.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[instance_id])
+    
+    print('AGUARDANDO STATUS OK')
+    waiter = client.get_waiter('instance_status_ok')
+    waiter.wait(InstanceIds=[instance_id])
+
+    print('STOPPING')
+    response = client.stop_instances(InstanceIds=[instance_id])
+
+    waiter = client.get_waiter('instance_stopped')
+    waiter.wait(InstanceIds=[instance_id])
+
+    print('CRIANDO IMAGEM')
+    response = client.create_image(
+        InstanceId=instance_id,
+        Name=image_name
     )
 
-    terminated = 0
-    for i in response['InstanceStatuses']:
-        if(not i['InstanceState']['Name'] == 'terminated'):
-            terminated += 1
+    waiter = client.get_waiter('image_available')
+    waiter.wait(ImageIds=[response['ImageId']])
 
-    return terminated
+    client.terminate_instances(InstanceIds=[instance_id])
 
-def check_status_ok():
-    response = client.describe_instance_status(
-        InstanceIds=instances_ids,
-        IncludeAllInstances=True
+def delete_image(img_name):
+    print('APAGANDO IMAGENS')
+    response = client.describe_images(
+        Filters=[
+        {
+            'Name': 'name',
+            'Values': [
+                img_name,
+            ]
+        },
+    ]
     )
 
-    terminated = 0
-    for i in response['InstanceStatuses']:
-        if(not i['InstanceState']['Name'] == 'terminated'):
-            terminated += 1
+    try:
+        img_id = response['Images'][0]['ImageId']
+        response = client.deregister_image(ImageId=img_id)
+    except:
+        pass
 
-    return terminated
+def create_load_balancer(name,sec_id):
+    print('CRIANDO LOAD BALANCER')
+    response = ldblcr.create_load_balancer(
+        LoadBalancerName=name,
+        Listeners=[{
+            'Protocol': 'HTTP',
+            'LoadBalancerPort': 80,
+            'InstancePort': 80
+        }],
+        AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
+        SecurityGroups=[sec_id],
+        Tags=[
+        {
+            'Key': 'name',
+            'Value': 'DecoLB'
+        },
+    ]
+    )
 
-
-print("\n\nCOMECOU")
+def delete_ld_balancer(name):
+    try:
+        print('DELETANDO LOAD BALANCER')
+        ldblcr.delete_load_balancer(LoadBalancerName=name)
+    except:
+        pass
 
 key_pair_name = "keypair-APS3-deco"
 sec_group_name = 'secgroup-APS3-deco'
+img_name = 'P1 Deco'
+load_name = 'LoadProjDeco'
 
-delete_instance()
+delete_instances()
+delete_image(img_name)
 create_keypair(key_pair_name)
-create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
-create_instance(key_pair_name, sec_group_name)
-# check_status_ok()
+sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
+ins_id = create_instance(key_pair_name, sec_group_name)
+create_image(ins_id,img_name)
+delete_ld_balancer(load_name)
+create_load_balancer(load_name,'sg-07c1b18ad1eaf764f')#sec_id)
 
 print("TERMINOU\n\n")
