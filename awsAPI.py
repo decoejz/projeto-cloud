@@ -17,6 +17,11 @@ ldblcr = boto3.client('elb',
     aws_secret_access_key=SECRET_KEY,
     region_name="us-east-1")
 
+autoscale = boto3.client('autoscaling',
+    aws_access_key_id=ACCESS_ID,
+    aws_secret_access_key=SECRET_KEY,
+    region_name="us-east-1")
+
 def create_keypair(name):
     check_exists = check_key_pair(name)
     if check_exists:
@@ -257,18 +262,42 @@ def delete_ld_balancer(name):
     except:
         pass
 
+def create_l_config(name,img_name,key_p_name,sec_g_id):
+    print('CRIANDO LAUNCH CONFIGURATION')
+    response = client.describe_images(
+        Filters=[
+        {
+            'Name': 'name',
+            'Values': [
+                img_name,
+            ]
+        },
+    ]
+    )
+    img_id = response['Images'][0]['ImageId']
+
+    autoscale.create_launch_configuration(
+        LaunchConfigurationName=name,
+        ImageId=img_id,
+        KeyName=key_p_name,
+        SecurityGroups=[sec_g_id],
+        InstanceType='t2.micro'
+    )
+
 key_pair_name = "keypair-APS3-deco"
 sec_group_name = 'secgroup-APS3-deco'
 img_name = 'P1 Deco'
 load_name = 'LoadProjDeco'
+launch_name = 'LaunchConfigDeco'
 
-delete_instances()
-delete_image(img_name)
-create_keypair(key_pair_name)
-sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
-ins_id = create_instance(key_pair_name, sec_group_name)
-create_image(ins_id,img_name)
-delete_ld_balancer(load_name)
-create_load_balancer(load_name,'sg-07c1b18ad1eaf764f')#sec_id)
+# delete_instances()
+# delete_image(img_name)
+# create_keypair(key_pair_name)
+# sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
+# ins_id = create_instance(key_pair_name, sec_group_name)
+# create_image(ins_id,img_name)
+# delete_ld_balancer(load_name)
+# create_load_balancer(load_name,sec_id)
+create_l_config(launch_name,img_name,key_pair_name,'sg-07c1b18ad1eaf764f')#sec_id)
 
 print("TERMINOU\n\n")
