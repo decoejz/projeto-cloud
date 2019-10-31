@@ -42,46 +42,28 @@ def create_keypair(name):
 
     print("CRIOU KEY PAIR")
 
-def create_sec_group(name,desc):
+def create_sec_group(name,desc,ports):
     check_exists = check_sec_group(name)
 
     if check_exists:
-        client.delete_security_group(GroupName=name)
+        try:
+            client.delete_security_group(GroupName=name)
+        except:
+            pass
         print("APAGOU SECURITY GROUP")
 
     response = client.create_security_group(Description=desc, GroupName=name)
 
     print("CRIOU SECURITY GROUP")
 
-    liberate_port(name)
+    liberate_port(name,ports)
 
     return response['GroupId']
 
-def liberate_port(name):
+def liberate_port(name,ports):
     client.authorize_security_group_ingress(
         GroupName=name,
-        IpPermissions=[
-            {
-                'FromPort': 22,
-                'IpProtocol': 'tcp',
-                'IpRanges': [
-                    {
-                        'CidrIp': '0.0.0.0/0'
-                    },
-                ],
-                'ToPort': 22,
-            },
-            {
-                'FromPort': 5000,
-                'IpProtocol': 'tcp',
-                'IpRanges': [
-                    {
-                        'CidrIp': '0.0.0.0/0'
-                    },
-                ],
-                'ToPort': 5000,
-            },
-        ]
+        IpPermissions=ports
     )
 
     print("LIBEROU PORTAS SECURITY GROUP")
@@ -236,7 +218,7 @@ def delete_image(img_name):
     except:
         pass
 
-def create_load_balancer(name,sec_id):
+def create_load_balancer(name,sec_inst_id):
     print('CRIANDO LOAD BALANCER')
     response = ldblcr.create_load_balancer(
         LoadBalancerName=name,
@@ -246,7 +228,7 @@ def create_load_balancer(name,sec_id):
             'InstancePort': 5000
         }],
         AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
-        SecurityGroups=[sec_id],
+        SecurityGroups=[sec_inst_id],
         Tags=[
         {
             'Key': 'name',
@@ -319,17 +301,21 @@ load_name = 'LoadProjDeco'
 launch_name = 'LaunchConfigDeco'
 auto_name = 'AutoScaleDeco'
 
+inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 5000,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 5000}]
+load_ports = [{'FromPort': 80,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 80}]
+
 delete_auto_scaling(auto_name)
 delete_l_config(launch_name)
 delete_ld_balancer(load_name)
 delete_instances()
 delete_image(img_name)
 create_keypair(key_pair_name)
-sec_id = create_sec_group(sec_group_name,'SecurityGroupAPS3 do deco')
+sec_inst_id = create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
+sec_load_id = create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
 ins_id = create_instance(key_pair_name, sec_group_name)
 create_image(ins_id,img_name)
-create_load_balancer(load_name,sec_id)
-create_l_config(launch_name,img_name,key_pair_name,[sec_id])
+create_load_balancer(load_name,sec_load_id)
+create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
 create_auto_scaling(auto_name,launch_name,[load_name])
 
 print("TERMINOU\n\n")
