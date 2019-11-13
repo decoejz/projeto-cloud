@@ -27,7 +27,7 @@ class AWS():
 		check_exists = self.check_key_pair(name)
 		if check_exists:
 			self.client.delete_key_pair(KeyName=name)
-			print("APAGOU KEY PAIR")
+			print("\033[1;31;49mAPAGOU KEY PAIR\033[0;49;49m")
 
 		response = self.client.create_key_pair(KeyName=name)
 
@@ -41,7 +41,7 @@ class AWS():
 
 		os.chmod(name, stat.S_IREAD)
 
-		print("CRIOU KEY PAIR")
+		print("\033[1;32;49mCRIOU KEY PAIR\033[0;49;49m")
 
 	def create_sec_group(self,name,desc,ports):
 		check_exists = self.check_sec_group(name)
@@ -50,16 +50,17 @@ class AWS():
 			try:
 				self.client.delete_security_group(GroupName=name)
 				sleep(1)
-			except:
+			except Exception as e:
+				print('\n\n',e,'\n\n')
 				pass
 			check_exists = self.check_sec_group(name)
-		print("APAGOU SECURITY GROUP")
+		print("\033[1;31;49mAPAGOU SECURITY GROUP\033[0;49;49m",name)
 
 		response = self.client.create_security_group(Description=desc, GroupName=name)
 
 		sleep(2)
 
-		print("CRIOU SECURITY GROUP")
+		print("\033[1;32;49mCRIOU SECURITY GROUP\033[0;49;49m",name)
 
 		self.liberate_port(name,ports)
 
@@ -71,10 +72,10 @@ class AWS():
 			IpPermissions=ports
 		)
 
-		print("LIBEROU PORTAS SECURITY GROUP")
+		print("\033[1;32;49mLIBEROU PORTAS SECURITY GROUP\033[0;49;49m")
 
 	def check_sec_group(self,name):
-		print('VERIFICA EXISTENCIA SECURITY GROUP',name)
+		print('\033[1;33;49mVERIFICA EXISTENCIA SECURITY GROUP\033[0;49;49m',name)
 		response = self.client.describe_security_groups()
 		
 		for i in response['SecurityGroups']:
@@ -82,7 +83,7 @@ class AWS():
 				return (True)
 
 	def check_key_pair(self,name):
-		print('VERIFICA EXISTENCIA KEY PAIR')
+		print('\033[1;33;49mVERIFICA EXISTENCIA KEY PAIR\033[0;49;49m')
 		response = self.client.describe_key_pairs()
 		
 		for i in response['KeyPairs']:
@@ -90,7 +91,8 @@ class AWS():
 				return (True)
 
 	def create_instance(self,key_pair_name,sec_group_name,userData,imageID,privateAddress):
-		print('VAI CRIAR INSTÂNCIA')
+		print('\033[1;32;49mVAI CRIAR INSTÂNCIA\033[0;49;49m',sec_group_name)
+		print('\033[1;36;49mISSO PODE LEVAR ALGUNS MINUTOS\033[0;49;49m')
 		if not privateAddress == None:
 			response = self.client.run_instances(
 				InstanceType='t2.micro',
@@ -138,6 +140,10 @@ class AWS():
 				],
 				UserData=userData
 			)
+
+		waiter = self.client.get_waiter('instance_status_ok')
+		waiter.wait(InstanceIds=[response['Instances'][0]['InstanceId']])
+
 		return (response['Instances'][0]['InstanceId'])
 
 	def delete_instances(self):
@@ -150,14 +156,14 @@ class AWS():
 				InstanceIds=instances_ids
 			)
 
-			print('TERMINANDO')
+			print('\033[1;31;49mTERMINANDO\033[0;49;49m')
 			waiter = self.client.get_waiter('instance_terminated')
 			waiter.wait(InstanceIds=instances_ids)
 		except:
 			pass
 
 	def get_instance_id(self):
-		print("CHECANDO INSTÂNCIAS")
+		print("\033[1;33;49mCHECANDO INSTÂNCIAS\033[0;49;49m")
 		response = self.client.describe_instances(
 			Filters=[
 				{
@@ -176,7 +182,7 @@ class AWS():
 		return instances_ids
 
 	def instance_filter(self,instances_ids):
-		print('CHECANDO STATUS')
+		print('\033[1;33;49mCHECANDO STATUS\033[0;49;49m')
 		response = self.client.describe_instance_status(
 			InstanceIds=instances_ids,
 			IncludeAllInstances=True
@@ -190,21 +196,21 @@ class AWS():
 		return instances_ids
 
 	def create_image(self,instance_id, image_name):
-		print('INICIALIZANDO')
+		print('\033[1;32;49mINICIALIZANDO\033[0;49;49m')
 		waiter = self.client.get_waiter('instance_running')
 		waiter.wait(InstanceIds=[instance_id])
 		
-		print('AGUARDANDO STATUS OK')
+		print('\033[1;33;49mAGUARDANDO STATUS OK\033[0;49;49m')
 		waiter = self.client.get_waiter('instance_status_ok')
 		waiter.wait(InstanceIds=[instance_id])
 
-		print('STOPPING')
+		print('\033[1;31;49mSTOPPING\033[0;49;49m')
 		response = self.client.stop_instances(InstanceIds=[instance_id])
 
 		waiter = self.client.get_waiter('instance_stopped')
 		waiter.wait(InstanceIds=[instance_id])
 
-		print('CRIANDO IMAGEM')
+		print('\033[1;32;49mCRIANDO IMAGEM\033[0;49;49m')
 		response = self.client.create_image(
 			InstanceId=instance_id,
 			Name=image_name
@@ -216,7 +222,7 @@ class AWS():
 		self.client.terminate_instances(InstanceIds=[instance_id])
 
 	def delete_image(self,img_name):
-		print('APAGANDO IMAGENS')
+		print('\033[1;31;49mAPAGANDO IMAGENS\033[0;49;49m')
 		response = self.client.describe_images(
 			Filters=[
 			{
@@ -235,7 +241,7 @@ class AWS():
 			pass
 
 	def create_load_balancer(self,name,sec_inst_id):
-		print('CRIANDO LOAD BALANCER')
+		print('\033[1;32;49mCRIANDO LOAD BALANCER\033[0;49;49m')
 		response = self.ldblcr.create_load_balancer(
 			LoadBalancerName=name,
 			Listeners=[{
@@ -255,13 +261,13 @@ class AWS():
 
 	def delete_ld_balancer(self,name):
 		try:
-			print('DELETANDO LOAD BALANCER')
+			print('\033[1;31;49mDELETANDO LOAD BALANCER\033[0;49;49m')
 			self.ldblcr.delete_load_balancer(LoadBalancerName=name)
 		except:
 			pass
 
 	def create_l_config(self,name,img_name,key_p_name,sec_g_id):
-		print('CRIANDO LAUNCH CONFIGURATION')
+		print('\033[1;32;49mCRIANDO LAUNCH CONFIGURATION\033[0;49;49m')
 		response = self.client.describe_images(
 			Filters=[
 			{
@@ -284,13 +290,13 @@ class AWS():
 
 	def delete_l_config(self,name):
 		try:
-			print('DELETANDO LAUNCH CONFIGURATION')
+			print('\033[1;31;49mDELETANDO LAUNCH CONFIGURATION\033[0;49;49m')
 			self.autoscale.delete_launch_configuration(LaunchConfigurationName=name)
 		except:
 			pass
 
 	def create_auto_scaling(self,name,l_config_name,load_name):
-		print('CRIANDO AUTO SCALING GROUP')
+		print('\033[1;32;49mCRIANDO AUTO SCALING GROUP\033[0;49;49m')
 		self.autoscale.create_auto_scaling_group(
 			AutoScalingGroupName=name,
 			LaunchConfigurationName=l_config_name,
@@ -302,7 +308,7 @@ class AWS():
 
 	def delete_auto_scaling(self,name):
 		try:
-			print('DELETANDO AUTO SCALING GROUP')
+			print('\033[1;31;49mDELETANDO AUTO SCALING GROUP\033[0;49;49m')
 			self.autoscale.delete_auto_scaling_group(
 				AutoScalingGroupName=name,
 				ForceDelete=True
@@ -314,14 +320,14 @@ class AWS():
 			pass
 
 	def check_autoscalling(self,name):
-		print('VERIFICA EXISTENCIA AUTOSCALLING GROUP',name)
+		print('\033[1;33;49mVERIFICA EXISTENCIA AUTOSCALLING GROUP\033[0;49;49m',name)
 		response = self.autoscale.describe_auto_scaling_groups(
 			AutoScalingGroupNames=[name]
 		)
 		return (not(len(response['AutoScalingGroups']) == 0))
 
 	def create_elastic_ip(self):
-		print('VAI CRIAR O ELASTIC IP')
+		print('\033[1;32;49mCRIANDO ELASTIC IP\033[0;49;49m')
 		response = self.client.allocate_address(Domain='vpc')
 		
 		self.client.create_tags(
@@ -338,7 +344,7 @@ class AWS():
 		return(response['PublicIp'])
 	
 	def destroy_elastic_ip(self):
-		print('DELETANDO ELASTIC IP')
+		print('\033[1;31;49mDELETANDO ELASTIC IP\033[0;49;49m')
 		response = self.client.describe_addresses(
 			Filters=[
 				{
@@ -355,6 +361,14 @@ class AWS():
 				response = self.client.release_address(
 					AllocationId=i['AllocationId']
 				)
+
+	def alocate_elastic_ip(self, pub_ip, inst_id):
+		print('\033[1;32;49mALOCANDO INSTANCIA COM IP ELASTICO\033[0;49;49m')
+		response = self.client.associate_address(
+			InstanceId=inst_id,
+			PublicIp=pub_ip,
+			AllowReassociation=True
+		)
 
 
 userData = '''#!/bin/bash
@@ -383,43 +397,56 @@ auto_name = 'AutoScaleDeco'
 
 inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 8080,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 8080}]
 load_ports = [{'FromPort': 80,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 80}]
+betweness_port = [{'FromPort': 0,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 65000}]
 
 print("\n\nCOMECOU REGIÃO 1")
 
 northVirginia = AWS("us-east-1")
+
+northVirginia.destroy_elastic_ip()
 northVirginia.delete_auto_scaling(auto_name)
 northVirginia.delete_l_config(launch_name)
 northVirginia.delete_ld_balancer(load_name)
 northVirginia.delete_instances()
 northVirginia.delete_image(img_name)
+
+betw_el_ip = northVirginia.create_elastic_ip()
+
 northVirginia.create_keypair(key_pair_name)
+
 sec_inst_id = northVirginia.create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
 sec_load_id = northVirginia.create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
+sec_betwenn_id = northVirginia.create_sec_group('sec-group-betwenn-deco','Security Group para a instancia intermediaria',betweness_port)
+
 ins_id = northVirginia.create_instance(key_pair_name, sec_group_name,userData,'ami-07d0cf3af28718ef8',None)
+betwen_id = northVirginia.create_instance(key_pair_name, 'sec-group-betwenn-deco','','ami-07d0cf3af28718ef8',None)
+
+northVirginia.alocate_elastic_ip(betw_el_ip,betwen_id)
+
 northVirginia.create_image(ins_id,img_name)
 northVirginia.create_load_balancer(load_name,sec_load_id)
 northVirginia.create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
 northVirginia.create_auto_scaling(auto_name,launch_name,[load_name])
 
 
-print("\n\nCOMECOU REGIÃO 2")
+# print("\n\nCOMECOU REGIÃO 2")
 
-userData = '''#!/bin/bash
-wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-systemctl enable mongod
-reboot
-'''
-sec_group_name = 'to_database'
-inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 5000,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 5000}]
-key_pair_name = 'key-pair-ohio'
+# userData = '''#!/bin/bash
+# wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
+# echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
+# sudo apt-get update
+# sudo apt-get install -y mongodb-org
+# systemctl enable mongod
+# reboot
+# '''
+# sec_group_name = 'to_database'
+# inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 5000,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 5000}]
+# key_pair_name = 'key-pair-ohio'
 
-ohio = AWS("us-east-2")
-ohio.delete_instances()
-ohio.create_keypair(key_pair_name)
-sec_gr_inst_id = ohio.create_sec_group(sec_group_name,'Security Group Instancia DB',inst_ports)
-ins_id = ohio.create_instance(key_pair_name, sec_group_name,userData,'ami-0d5d9d301c853a04a',None)
+# ohio = AWS("us-east-2")
+# ohio.delete_instances()
+# ohio.create_keypair(key_pair_name)
+# sec_gr_inst_id = ohio.create_sec_group(sec_group_name,'Security Group Instancia DB',inst_ports)
+# ins_id = ohio.create_instance(key_pair_name, sec_group_name,userData,'ami-0d5d9d301c853a04a',None)
 
 print("TERMINOU\n\n")
