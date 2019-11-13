@@ -91,7 +91,7 @@ class AWS():
 				return (True)
 
 	def create_instance(self,key_pair_name,sec_group_name,userData,imageID,privateAddress):
-		print('\033[1;32;49mVAI CRIAR INSTÂNCIA\033[0;49;49m',sec_group_name)
+		print('\033[1;32;49mCRIANDO INSTÂNCIA\033[0;49;49m',sec_group_name)
 		print('\033[1;36;49mISSO PODE LEVAR ALGUNS MINUTOS\033[0;49;49m')
 		if not privateAddress == None:
 			response = self.client.run_instances(
@@ -371,6 +371,9 @@ class AWS():
 		)
 
 
+r1 = "us-east-1"
+print("\n\nCOMECOU REGIÃO",r1)
+
 userData = '''#!/bin/bash
 git clone https://github.com/decoejz/APS-cloud-comp.git
 cd APS-cloud-comp
@@ -399,54 +402,88 @@ inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0
 load_ports = [{'FromPort': 80,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 80}]
 betweness_port = [{'FromPort': 0,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 65000}]
 
-print("\n\nCOMECOU REGIÃO 1")
-
-northVirginia = AWS("us-east-1")
+northVirginia = AWS(r1)
 
 northVirginia.destroy_elastic_ip()
-northVirginia.delete_auto_scaling(auto_name)
-northVirginia.delete_l_config(launch_name)
-northVirginia.delete_ld_balancer(load_name)
-northVirginia.delete_instances()
-northVirginia.delete_image(img_name)
+# northVirginia.delete_auto_scaling(auto_name)
+# northVirginia.delete_l_config(launch_name)
+# northVirginia.delete_ld_balancer(load_name)
+# northVirginia.delete_instances()
+# northVirginia.delete_image(img_name)
 
 betw_el_ip = northVirginia.create_elastic_ip()
 
-northVirginia.create_keypair(key_pair_name)
+# northVirginia.create_keypair(key_pair_name)
 
-sec_inst_id = northVirginia.create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
-sec_load_id = northVirginia.create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
-sec_betwenn_id = northVirginia.create_sec_group('sec-group-betwenn-deco','Security Group para a instancia intermediaria',betweness_port)
+# sec_inst_id = northVirginia.create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
+# sec_load_id = northVirginia.create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
+# sec_betwenn_id = northVirginia.create_sec_group('sec-group-betwenn-deco','Security Group para a instancia intermediaria',betweness_port)
 
-ins_id = northVirginia.create_instance(key_pair_name, sec_group_name,userData,'ami-07d0cf3af28718ef8',None)
-betwen_id = northVirginia.create_instance(key_pair_name, 'sec-group-betwenn-deco','','ami-07d0cf3af28718ef8',None)
+# ins_id = northVirginia.create_instance(key_pair_name, sec_group_name,userData,'ami-07d0cf3af28718ef8',None)
+# betwen_id = northVirginia.create_instance(key_pair_name, 'sec-group-betwenn-deco','','ami-07d0cf3af28718ef8',None)
 
-northVirginia.alocate_elastic_ip(betw_el_ip,betwen_id)
+# northVirginia.alocate_elastic_ip(betw_el_ip,betwen_id)
 
-northVirginia.create_image(ins_id,img_name)
-northVirginia.create_load_balancer(load_name,sec_load_id)
-northVirginia.create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
-northVirginia.create_auto_scaling(auto_name,launch_name,[load_name])
+# northVirginia.create_image(ins_id,img_name)
+# northVirginia.create_load_balancer(load_name,sec_load_id)
+# northVirginia.create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
+# northVirginia.create_auto_scaling(auto_name,launch_name,[load_name])
 
+print('FINALIZOU',r1)
 
-# print("\n\nCOMECOU REGIÃO 2")
+r2 = "us-east-2"
+print("\n\nCOMECOU REGIÃO",r2)
 
-# userData = '''#!/bin/bash
-# wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-# echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
-# sudo apt-get update
-# sudo apt-get install -y mongodb-org
-# systemctl enable mongod
-# reboot
-# '''
-# sec_group_name = 'to_database'
-# inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 5000,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 5000}]
-# key_pair_name = 'key-pair-ohio'
+#Fixo para todas as maquinas de Ohio
+key_pair_name_ohio = 'key-pair-ohio'
+inst_type_ohio = 'ami-0d5d9d301c853a04a' #t2.micro
 
-# ohio = AWS("us-east-2")
-# ohio.delete_instances()
-# ohio.create_keypair(key_pair_name)
-# sec_gr_inst_id = ohio.create_sec_group(sec_group_name,'Security Group Instancia DB',inst_ports)
-# ins_id = ohio.create_instance(key_pair_name, sec_group_name,userData,'ami-0d5d9d301c853a04a',None)
+#Especifico para a maquina de WebServer
+user_data_ws_ohio = '''#!/bin/bash
+git clone https://github.com/decoejz/APS-cloud-comp.git
+cd APS-cloud-comp
+source comandos.sh
+touch /etc/init.d/runWebServer.sh
+echo '#!/bin/bash
+python3 /APS-cloud-comp/webServer.py' >> /etc/init.d/runWebServer.sh
+chmod 755 /etc/init.d/runWebServer.sh
+echo '
+[Service]
+ExecStart=/etc/init.d/runWebServer.sh
 
+[Install]
+WantedBy=default.target' >> /etc/systemd/system/runWebServer.service
+systemctl enable runWebServer
+reboot'''
+
+sec_group_name_ws_ohio = 'web_server'
+inst_ports_ws_ohio = [{'FromPort': 8080,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': betw_el_ip+'/32'},],'ToPort': 8080}]
+
+#Especifico para a maquina com o banco de dados
+user_data_db_ohio = '''#!/bin/bash
+wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+systemctl enable mongod
+reboot'''
+
+sec_group_name_db_ohio = 'database'
+inst_ports_db_ohio = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 27017,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 27017}]
+
+ohio = AWS(r2)
+ohio.destroy_elastic_ip()
+ohio.delete_instances()
+
+ohio.create_keypair(key_pair_name_ohio)
+ws_elastic_ip = ohio.create_elastic_ip()
+ohio.create_sec_group(sec_group_name_ws_ohio,'Security Group Instancia WS',inst_ports_ws_ohio)
+ohio.create_sec_group(sec_group_name_db_ohio,'Security Group Instancia DB',inst_ports_db_ohio)
+
+ws_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_ws_ohio,user_data_ws_ohio,inst_type_ohio,None)
+ohio.alocate_elastic_ip(ws_elastic_ip,ws_inst_id)
+
+db_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_db_ohio,user_data_db_ohio,inst_type_ohio,None)
+
+print('FINALIZOU',r2)
 print("TERMINOU\n\n")
