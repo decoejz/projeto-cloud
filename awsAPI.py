@@ -160,11 +160,10 @@ class AWS():
                 InstanceIds=instances_ids
             )
 
-            print('\033[1;31;49mTERMINANDO\033[0;49;49m')
+            print('\033[1;31;49mTERMINANDO...\033[0;49;49m')
             waiter = self.client.get_waiter('instance_terminated')
             waiter.wait(InstanceIds=instances_ids)
         except Exception as e:
-            print('\n\n',e,'\n\n')
             pass
 
     def get_instance_id(self):
@@ -379,24 +378,39 @@ class AWS():
             AllowReassociation=True
         )
 
-    def get_sec_ocur(self,w_string,w_char):
+    def get_thr_ocur(self,w_string,w_char,times):
         count = 0
         for i in range(len(w_string)):
             if w_string[i] == w_char:
                 count += 1
-                if count == 2:
+                if count == times:
                     return i
 
     def get_local_fix_ip(self):
+        print('\033[1;32;49mALOCANDO IP PRIVADO FIXO\033[0;49;49m')
         response = self.client.describe_vpcs()
-        cidr_vpc = response['Vpcs'][0]['CidrBlock']
-        sec_dot_place = self.get_sec_ocur(cidr_vpc,'.')
-        new_fixed_ip = cidr_vpc[:sec_dot_place]+"."+str(randint(0,255))+"."+str(randint(0,254))
+        vpc_id = response['Vpcs'][0]['VpcId']
+
+        response = self.client.describe_subnets(
+            Filters=[
+                {
+                    'Name': 'vpc-id',
+                    'Values': [
+                        vpc_id,
+                    ]
+                },
+            ],
+        )
+
+        cidr_vpc = response['Subnets'][0]['CidrBlock']
+        sec_dot_place = self.get_thr_ocur(cidr_vpc,'.',3)
+        new_fixed_ip = cidr_vpc[:sec_dot_place]+"."+str(randint(0,254))
         
         while new_fixed_ip in self.used_private_ip:
-            new_fixed_ip = cidr_vpc[:sec_dot_place]+"."+str(randint(0,255))+"."+str(randint(1,254))
+            new_fixed_ip = cidr_vpc[:sec_dot_place]+"."+str(randint(0,254))
         
         self.used_private_ip.append(new_fixed_ip)
+
         return new_fixed_ip
 
 r1 = "us-east-1"
@@ -459,14 +473,20 @@ betw_el_ip = northVirginia.create_elastic_ip()
 
 print('FINALIZOU',r1)
 
+##########REGIAO 2################REGIAO 2####################REGIAO 2################REGIAO 2#######
+
 r2 = "us-east-2"
 print("\n\nCOMECOU REGIÃO",r2)
+ohio = AWS(r2)
+private_ip_ws_ohio = ohio.get_local_fix_ip()
+private_ip_db_ohio = ohio.get_local_fix_ip()
+ohio.destroy_elastic_ip()
+ohio.delete_instances()
 
 #Fixo para todas as maquinas de Ohio
 key_pair_name_ohio = 'key-pair-ohio'
 inst_type_ohio = 'ami-0d5d9d301c853a04a' #t2.micro
 
-private_ip_db = "172.31.26.182"
 
 #Especifico para a maquina de WebServer
 open_port_ws = 8080
@@ -475,7 +495,7 @@ git clone https://github.com/decoejz/APS-cloud-comp.git
 cd APS-cloud-comp
 
 echo '{
-    \"db_host\": \"'''+str(private_ip_db)+'''\",
+    \"db_host\": \"'''+str(private_ip_db_ohio)+'''\",
     \"hostname\": \"0.0.0.0\",
     \"port\": '''+str(open_port_ws)+'''
 }' >> /APS-cloud-comp/hosts.json
@@ -554,23 +574,17 @@ systemctl enable mongod
 reboot'''
 
 sec_group_name_db_ohio = 'database'
-inst_ports_db_ohio = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 27017,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 27017}]
+inst_ports_db_ohio = [{'FromPort': 27017,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': private_ip_ws_ohio+'/32'},],'ToPort': 27017}]
 
-ohio = AWS(r2)
-ws_fix_private_ip = ohio.get_local_fix_ip()
-print(ws_fix_private_ip)
-# ohio.destroy_elastic_ip()
-# ohio.delete_instances()
-
-# ohio.create_keypair(key_pair_name_ohio)
-# ws_elastic_ip = ohio.create_elastic_ip()
+ohio.create_keypair(key_pair_name_ohio)
+ws_elastic_ip = ohio.create_elastic_ip()
 ohio.create_sec_group(sec_group_name_ws_ohio,'Security Group Instancia WS',inst_ports_ws_ohio)
-# ohio.create_sec_group(sec_group_name_db_ohio,'Security Group Instancia DB',inst_ports_db_ohio)
+ohio.create_sec_group(sec_group_name_db_ohio,'Security Group Instancia DB',inst_ports_db_ohio)
 
-ws_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_ws_ohio,user_data_ws_ohio,inst_type_ohio,None)
-# ohio.alocate_elastic_ip(ws_elastic_ip,ws_inst_id)
+ws_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_ws_ohio,user_data_ws_ohio,inst_type_ohio,private_ip_ws_ohio)
+ohio.alocate_elastic_ip(ws_elastic_ip,ws_inst_id)
 
-# db_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_db_ohio,user_data_db_ohio,inst_type_ohio,None)
+db_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_db_ohio,user_data_db_ohio,inst_type_ohio,private_ip_db_ohio)
 
 print('FINALIZOU',r2)
 print("TERMINOU\n\n")
