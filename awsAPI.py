@@ -36,8 +36,7 @@ class AWS():
 
         try:
             os.chmod(name, stat.S_IWRITE)
-        except Exception as e:
-            print('\n\n',e,'\n\n')
+        except:
             pass
 
         with open(name,'w') as private:
@@ -54,8 +53,7 @@ class AWS():
             try:
                 self.client.delete_security_group(GroupName=name)
                 sleep(1)
-            except Exception as e:
-                print('\n\n',e,'\n\n')
+            except:
                 pass
             check_exists = self.check_sec_group(name)
         print("\033[1;31;49mAPAGOU SECURITY GROUP\033[0;49;49m",name)
@@ -94,8 +92,8 @@ class AWS():
             if i['KeyName'] == name:
                 return (True)
 
-    def create_instance(self,key_pair_name,sec_group_name,userData,imageID,privateAddress):
-        print('\033[1;32;49mCRIANDO INSTÂNCIA\033[0;49;49m',sec_group_name)
+    def create_instance(self,key_pair_name,sec_group_name_id,userData,imageID,privateAddress,subnet_id):
+        print('\033[1;32;49mCRIANDO INSTÂNCIA\033[0;49;49m',sec_group_name_id)
         print('\033[1;36;49mISSO PODE LEVAR ALGUNS MINUTOS\033[0;49;49m')
         if not privateAddress == None:
             response = self.client.run_instances(
@@ -104,9 +102,10 @@ class AWS():
                 KeyName=key_pair_name,
                 MaxCount=1,
                 MinCount=1,
-                SecurityGroups=[
-                    sec_group_name
+                SecurityGroupIds=[
+                    sec_group_name_id
                 ],
+                SubnetId=subnet_id,
                 TagSpecifications=[
                     {
                         'ResourceType': 'instance',
@@ -128,8 +127,8 @@ class AWS():
                 KeyName=key_pair_name,
                 MaxCount=1,
                 MinCount=1,
-                SecurityGroups=[
-                    sec_group_name
+                SecurityGroupIds=[
+                    sec_group_name_id
                 ],
                 TagSpecifications=[
                     {
@@ -163,7 +162,7 @@ class AWS():
             print('\033[1;31;49mTERMINANDO...\033[0;49;49m')
             waiter = self.client.get_waiter('instance_terminated')
             waiter.wait(InstanceIds=instances_ids)
-        except Exception as e:
+        except:
             pass
 
     def get_instance_id(self):
@@ -208,7 +207,7 @@ class AWS():
         waiter = self.client.get_waiter('instance_status_ok')
         waiter.wait(InstanceIds=[instance_id])
 
-        print('\033[1;31;49mSTOPPING\033[0;49;49m')
+        print('\033[1;31;49mSTOPPING...\033[0;49;49m')
         response = self.client.stop_instances(InstanceIds=[instance_id])
 
         waiter = self.client.get_waiter('instance_stopped')
@@ -241,18 +240,17 @@ class AWS():
         try:
             img_id = response['Images'][0]['ImageId']
             response = self.client.deregister_image(ImageId=img_id)
-        except Exception as e:
-            print('\n\n',e,'\n\n')
+        except:
             pass
 
-    def create_load_balancer(self,name,sec_inst_id):
+    def create_load_balancer(self,name,sec_inst_id,inst_port):
         print('\033[1;32;49mCRIANDO LOAD BALANCER\033[0;49;49m')
         response = self.ldblcr.create_load_balancer(
             LoadBalancerName=name,
             Listeners=[{
                 'Protocol': 'HTTP',
                 'LoadBalancerPort': 80,
-                'InstancePort': 5000
+                'InstancePort': inst_port
             }],
             AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
             SecurityGroups=[sec_inst_id],
@@ -264,12 +262,13 @@ class AWS():
         ]
         )
 
+        return response['DNSName']
+
     def delete_ld_balancer(self,name):
         try:
             print('\033[1;31;49mDELETANDO LOAD BALANCER\033[0;49;49m')
             self.ldblcr.delete_load_balancer(LoadBalancerName=name)
-        except Exception as e:
-            print('\n\n',e,'\n\n')
+        except:
             pass
 
     def create_l_config(self,name,img_name,key_p_name,sec_g_id):
@@ -298,18 +297,17 @@ class AWS():
         try:
             print('\033[1;31;49mDELETANDO LAUNCH CONFIGURATION\033[0;49;49m')
             self.autoscale.delete_launch_configuration(LaunchConfigurationName=name)
-        except Exception as e:
-            print('\n\n',e,'\n\n')
+        except:
             pass
 
-    def create_auto_scaling(self,name,l_config_name,load_name):
+    def create_auto_scaling(self,name,l_config_name,load_name,availability_zone):
         print('\033[1;32;49mCRIANDO AUTO SCALING GROUP\033[0;49;49m')
         self.autoscale.create_auto_scaling_group(
             AutoScalingGroupName=name,
             LaunchConfigurationName=l_config_name,
             MinSize=1,
             MaxSize=5,
-            AvailabilityZones=['us-east-1a','us-east-1b','us-east-1c','us-east-1d','us-east-1e','us-east-1f'],
+            AvailabilityZones=[availability_zone],
             LoadBalancerNames=load_name
         )
 
@@ -323,8 +321,7 @@ class AWS():
 
             while self.check_autoscalling(name):
                 sleep(10)
-        except Exception as e:
-            print('\n\n',e,'\n\n')
+        except:
             pass
 
     def check_autoscalling(self,name):
@@ -403,6 +400,8 @@ class AWS():
         )
 
         cidr_vpc = response['Subnets'][0]['CidrBlock']
+        subnet_id = response['Subnets'][0]['SubnetId']
+        availability_zone = response['Subnets'][0]['AvailabilityZone']
         sec_dot_place = self.get_thr_ocur(cidr_vpc,'.',3)
         new_fixed_ip = cidr_vpc[:sec_dot_place]+"."+str(randint(0,254))
         
@@ -411,18 +410,48 @@ class AWS():
         
         self.used_private_ip.append(new_fixed_ip)
 
-        return new_fixed_ip
+        return new_fixed_ip, subnet_id, availability_zone
 
 r1 = "us-east-1"
+r2 = "us-east-2"
 print("\n\nCOMECOU REGIÃO",r1)
+open_port_ws = 8080
 
-userData = '''#!/bin/bash
-git clone https://github.com/decoejz/APS-cloud-comp.git
-cd APS-cloud-comp
+northVirginia = AWS(r1)
+ohio = AWS(r2)
+ohio.destroy_elastic_ip()
+ws_elastic_ip_ohio = ohio.create_elastic_ip()
+
+private_ip_red_nv,subnet_id_red_nv, availability_zone_red_nv = northVirginia.get_local_fix_ip()
+
+user_data_ws_nv = '''#!/bin/bash
+git clone https://github.com/decoejz/redirect_ws_cloud.git
+cd redirect_ws_cloud
 source comandos.sh
 touch /etc/init.d/runWebServer.sh
 echo '#!/bin/bash
-python3 /APS-cloud-comp/webServer.py' >> /etc/init.d/runWebServer.sh
+export IP_REDIRECT=\"'''+str(private_ip_red_nv)+'''\"
+export R_PORT='''+str(open_port_ws)+'''
+python3 /redirect_ws_cloud/webServer.py' >> /etc/init.d/runWebServer.sh
+chmod 755 /etc/init.d/runWebServer.sh
+echo '
+[Service]
+ExecStart=/etc/init.d/runWebServer.sh
+
+[Install]
+WantedBy=default.target' >> /etc/systemd/system/runWebServer.service
+systemctl enable runWebServer
+reboot'''
+
+user_data_red_nv='''#!/bin/bash
+git clone https://github.com/decoejz/redirect_ws_cloud.git
+cd redirect_ws_cloud
+source comandos.sh
+touch /etc/init.d/runWebServer.sh
+echo '#!/bin/bash
+export IP_REDIRECT=\"'''+str(ws_elastic_ip_ohio)+'''\"
+export R_PORT='''+str(open_port_ws)+'''
+python3 /redirect_ws_cloud/webServer.py' >> /etc/init.d/runWebServer.sh
 chmod 755 /etc/init.d/runWebServer.sh
 echo '
 [Service]
@@ -440,48 +469,44 @@ load_name = 'LoadProjDeco'
 launch_name = 'LaunchConfigDeco'
 auto_name = 'AutoScaleDeco'
 
-inst_ports = [{'FromPort': 22,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 22},{'FromPort': 8080,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 8080}]
+inst_ports = [{'FromPort': open_port_ws,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': open_port_ws}]
 load_ports = [{'FromPort': 80,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 80}]
 betweness_port = [{'FromPort': 0,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': '0.0.0.0/0'},],'ToPort': 65000}]
 
-northVirginia = AWS(r1)
-
 northVirginia.destroy_elastic_ip()
-# northVirginia.delete_auto_scaling(auto_name)
-# northVirginia.delete_l_config(launch_name)
-# northVirginia.delete_ld_balancer(load_name)
-# northVirginia.delete_instances()
-# northVirginia.delete_image(img_name)
+northVirginia.delete_auto_scaling(auto_name)
+northVirginia.delete_l_config(launch_name)
+northVirginia.delete_ld_balancer(load_name)
+northVirginia.delete_instances()
+northVirginia.delete_image(img_name)
 
 betw_el_ip = northVirginia.create_elastic_ip()
 
-# northVirginia.create_keypair(key_pair_name)
+northVirginia.create_keypair(key_pair_name)
 
-# sec_inst_id = northVirginia.create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
-# sec_load_id = northVirginia.create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
-# sec_betwenn_id = northVirginia.create_sec_group('sec-group-betwenn-deco','Security Group para a instancia intermediaria',betweness_port)
+sec_inst_id = northVirginia.create_sec_group(sec_group_name,'Security Group Instancia projeto',inst_ports)
+sec_load_id = northVirginia.create_sec_group('sec-group-load-deco','Security Group Load Balancer projeto',load_ports)
+sec_betwenn_id = northVirginia.create_sec_group('sec-group-betwenn-deco','Security Group para a instancia intermediaria',betweness_port)
 
-# ins_id = northVirginia.create_instance(key_pair_name, sec_group_name,userData,'ami-07d0cf3af28718ef8',None)
-# betwen_id = northVirginia.create_instance(key_pair_name, 'sec-group-betwenn-deco','','ami-07d0cf3af28718ef8',None)
+ins_id = northVirginia.create_instance(key_pair_name, sec_inst_id,user_data_ws_nv,'ami-07d0cf3af28718ef8',None,None)
+betwen_id = northVirginia.create_instance(key_pair_name, sec_betwenn_id,user_data_red_nv,'ami-07d0cf3af28718ef8',private_ip_red_nv,subnet_id_red_nv)
 
-# northVirginia.alocate_elastic_ip(betw_el_ip,betwen_id)
+northVirginia.alocate_elastic_ip(betw_el_ip,betwen_id)
 
-# northVirginia.create_image(ins_id,img_name)
-# northVirginia.create_load_balancer(load_name,sec_load_id)
-# northVirginia.create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
-# northVirginia.create_auto_scaling(auto_name,launch_name,[load_name])
+northVirginia.create_image(ins_id,img_name)
+acess_ip = northVirginia.create_load_balancer(load_name,sec_load_id,open_port_ws)
+northVirginia.create_l_config(launch_name,img_name,key_pair_name,[sec_inst_id])
+northVirginia.create_auto_scaling(auto_name,launch_name,[load_name],availability_zone_red_nv)
 
 print('FINALIZOU',r1)
 
 ##########REGIAO 2################REGIAO 2####################REGIAO 2################REGIAO 2#######
 
-r2 = "us-east-2"
 print("\n\nCOMECOU REGIÃO",r2)
-ohio = AWS(r2)
-private_ip_ws_ohio = ohio.get_local_fix_ip()
-private_ip_db_ohio = ohio.get_local_fix_ip()
-ohio.destroy_elastic_ip()
+
 ohio.delete_instances()
+private_ip_ws_ohio, subnet_id_ws_ohio, availability_zone_ws_ohio = ohio.get_local_fix_ip()
+private_ip_db_ohio, subnet_id_db_ohio, availability_zone_db_ohio = ohio.get_local_fix_ip()
 
 #Fixo para todas as maquinas de Ohio
 key_pair_name_ohio = 'key-pair-ohio'
@@ -489,7 +514,6 @@ inst_type_ohio = 'ami-0d5d9d301c853a04a' #t2.micro
 
 
 #Especifico para a maquina de WebServer
-open_port_ws = 8080
 user_data_ws_ohio = '''#!/bin/bash
 git clone https://github.com/decoejz/APS-cloud-comp.git
 cd APS-cloud-comp
@@ -577,14 +601,15 @@ sec_group_name_db_ohio = 'database'
 inst_ports_db_ohio = [{'FromPort': 27017,'IpProtocol': 'tcp','IpRanges': [{'CidrIp': private_ip_ws_ohio+'/32'},],'ToPort': 27017}]
 
 ohio.create_keypair(key_pair_name_ohio)
-ws_elastic_ip = ohio.create_elastic_ip()
-ohio.create_sec_group(sec_group_name_ws_ohio,'Security Group Instancia WS',inst_ports_ws_ohio)
-ohio.create_sec_group(sec_group_name_db_ohio,'Security Group Instancia DB',inst_ports_db_ohio)
+sec_ws_id_ohio = ohio.create_sec_group(sec_group_name_ws_ohio,'Security Group Instancia WS',inst_ports_ws_ohio)
+sec_db_id_ohio = ohio.create_sec_group(sec_group_name_db_ohio,'Security Group Instancia DB',inst_ports_db_ohio)
 
-ws_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_ws_ohio,user_data_ws_ohio,inst_type_ohio,private_ip_ws_ohio)
-ohio.alocate_elastic_ip(ws_elastic_ip,ws_inst_id)
+ws_inst_id = ohio.create_instance(key_pair_name_ohio, sec_ws_id_ohio,user_data_ws_ohio,inst_type_ohio,private_ip_ws_ohio,subnet_id_ws_ohio)
+ohio.alocate_elastic_ip(ws_elastic_ip_ohio,ws_inst_id)
 
-db_inst_id = ohio.create_instance(key_pair_name_ohio, sec_group_name_db_ohio,user_data_db_ohio,inst_type_ohio,private_ip_db_ohio)
+db_inst_id = ohio.create_instance(key_pair_name_ohio, sec_db_id_ohio,user_data_db_ohio,inst_type_ohio,private_ip_db_ohio,subnet_id_db_ohio)
 
 print('FINALIZOU',r2)
 print("TERMINOU\n\n")
+
+print('Entre no endereço abaixo para acessar a aplicacao:\n{}\n\n'.format(acess_ip))
