@@ -12,13 +12,15 @@ pip3 install boto3
 
 ## Execução
 
-1) No terminal execute
+1) Atualize o arquivo [set_env](https://github.com/decoejz/projeto-cloud/blob/master/set_env) com as suas credenciais
+
+2) No terminal execute
 
 ```
 source set_env
 ```
 
-2) Ainda no terminal, execute
+3) Ainda no terminal, execute
 
 ```
 python3 awsAPI.py
